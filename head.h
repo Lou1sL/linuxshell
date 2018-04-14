@@ -14,7 +14,6 @@
 int g_commandMax = 1024;
 int g_commandMaxWords = 128;
 int g_currentDirectoryMax = 1024;
-bool g_redirect = 0;
 int g_out;
 int g_in;
 int running_pid=0;
@@ -36,10 +35,10 @@ struct process* addProcessInList(int process_id, struct process *head){
     newNode->id = process_id;
     newNode->next = NULL;
 
-    if(head == NULL){ // Αν η λίστα είναι άδεια
+    if(head == NULL){
         head = newNode;
         return head;
-    } else { // Πρόσθεσε τη διεργασία στο τέλος της λίστας
+    } else {
         struct process *current = head;
         while (current->next!=NULL) {
             current=current->next;
@@ -68,6 +67,5 @@ int ExecuteInput(char** args, int length,int background);
 char* ReadInput();
 char** TokenizeInput(char* input,int* length);
 int Redirect(char* redirectSymbol,char* filename);
-void directBack();
 char** ParseInput(char* input, int* length,int* background);
 void Round_Robbin(int signal);

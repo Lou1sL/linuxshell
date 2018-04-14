@@ -1,4 +1,3 @@
-/* 判断字符串是否是指定结尾 */
 int endsWith(char *s,char *end)
 {
     if(strlen(s) >= strlen(end)) {
@@ -36,7 +35,7 @@ int changeDir(char* to) {
     return 0;
 }
 
-/* 清理内存池 */
+/* 释放内存 */
 void Deallocate(char **array,int length)
 {
     int i = 0;
@@ -46,62 +45,83 @@ void Deallocate(char **array,int length)
     free(array);
 }
 
-/* Δέχεται ως ορίσματα τα arguments του εκτελέσιμου καθώς και μια μεταβλητή που ορίζει αν η εκτέλεση γίνεται στο υπόβαθρο */
+/* 执行命令 */
 int Launch(char** args,int background) {
     pid_t pid = fork();
 
-    if(pid == 0) { // Διεργασία παιδί - Εκτελεί το εξωτερικό πρόγραμμα
+    if(pid == 0) {
         execvp(args[0],args);
-
-    } else if(pid > 0) { // Διεργασία γονέας
-          if(background == 0){ // Αν δεν πρέπει να εκτελεστεί στο background
+		
+    } else if(pid > 0) {
+          if(background == 0){
                 int status;
                 do {
-                    waitpid(pid, &status, WUNTRACED); // Περίμενε τη διεργασία παιδί, για να μη μένουν zombies διεργασίες
-                } while (!WIFEXITED(status) && !WIFSIGNALED(status)); // Η διεργασία παιδί είτε τερματίστηκε (κανονικά ή με error) είτε "σκοτώθηκε" από signal
-           } else{ // Αν εκτελείται στο background η διεργασία γονέας δεν πρέπει να κάνει wait
+                    waitpid(pid, &status, WUNTRACED);
+                } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+           } else{
                 kill(pid,SIGSTOP);
-                head = addProcessInList(pid,head); // Η διεργασία μπαίνει στη λίστα
+                head = addProcessInList(pid,head);
            }
 
-    } else { // pid < 0 -> Error
+    } else {
+		
         fprintf(stderr,"Fork() Error");
         return EXIT_FAILURE;
     }
     return 0;
 }
 
-/* 执行命令 */
+/* 分析输入 */
 int ExecuteInput(char** args, int length,int background) {
     if(args == NULL) {
         return EXIT_FAILURE;
     }
-    // 检测是否包含了管道
-    int i = 0;
-    char** leftArgs = (char**)malloc(sizeof(char*) * length); // 管道前命令
-    int left_i = 0; // H θέση που βρισκόμαστε στον πίνακα leftArgs
-    char** rightArgs = (char**)malloc(sizeof(char*) * length); // 管道后命令
-    int right_i = 0; // H θέση που βρισκόμαστε στον πίνακα rightArgs
-    bool left = 1; // Ελέγχει αν είμαστε πριν ή μετά τη διασωλήνωση εφόσον αυτή υπάρχει
+	
+    // 检测是否包含了管道并对相应的左右部分进行处理
+	
+	// 管道前命令
+    char** leftArgs = (char**)malloc(sizeof(char*) * length); 
+	
+	// 管道前命令迭代器
+    int left_i = 0; 
+	
+	// 管道后命令（如果没有管道，则不会被用到）
+    char** rightArgs = (char**)malloc(sizeof(char*) * length); 
+	
+	// 管道后命令迭代器
+    int right_i = 0;
+	
+	// 管道控制标志
+    bool left = 1;
+	
+	int i = 0;
     while(args[i] != NULL) {
-        if(strcmp(args[i],"|") != 0 && left == 1) { // Η αριστερή εντολή της διασωλήνωσης
+		
+		// 控制标志开且当前字符非管道字符时，迭代将命令拷贝至管道前命令
+        if(strcmp(args[i],"|") != 0 && left == 1) { 
             leftArgs[left_i] = (char*)malloc(sizeof(char) * (strlen(args[i]) + 1));
             strcpy(leftArgs[left_i],args[i]);
             left_i++;
-        } else if(strcmp(args[i],"|") != 0 && left == 0) { // Η δεξιά εντολή της διασωλήνωσης
+			
+			// 控制标志关且当前字符非管道字符时，迭代将命令拷贝至管道后命令
+        } else if(strcmp(args[i],"|") != 0 && left == 0) { 
             rightArgs[right_i] = (char*)malloc(sizeof(char) * (strlen(args[i]) + 1));
             strcpy(rightArgs[right_i],args[i]);
             right_i++;
-        } else if(strcmp(args[i],"|") == 0) { // Ελέγχει αν υπάρχει διασωλήνωση
+			
+			// 当前字符是管道字符，关闭管道控制标志
+        } else if(strcmp(args[i],"|") == 0) { 
             left = 0;
         }
+		
+		
         rightArgs[right_i] = NULL;
         leftArgs[left_i] = NULL;
         i++;
     }
 
-    // Εκτέλεση εντολής
-    if(rightArgs[0] != NULL) { // Αν υπάρχει διασωλήνωση
+    // 有管道
+    if(rightArgs[0] != NULL) {
         errno = 0;
         int pipefd[2];
         pipe(pipefd);
@@ -111,15 +131,14 @@ int ExecuteInput(char** args, int length,int background) {
         }
 
         errno = 0;
-        pid_t pid; // Δημιουργώ διεργασία παιδί
+        pid_t pid;
         if(errno) {
             perror("An error occured");
             exit(EXIT_FAILURE);
         }
 
-        // Το παιδί εκτελεί το αριστερό μέρος της διασωλήνωσης
         if(fork() == 0) {
-            dup2(pipefd[0],0); // Ανάγνωση από είσοδο pipe όχι από stdin
+            dup2(pipefd[0],0);
             close(pipefd[1]);
             errno =0;
             execvp(rightArgs[0],rightArgs);
@@ -127,9 +146,12 @@ int ExecuteInput(char** args, int length,int background) {
                 perror("An error occured");
                 exit(EXIT_FAILURE);
             }
+			
             waitpid(pid,NULL,0);
-        } else if((pid=fork()) == 0) { // Διεργασία γονέας
-            dup2(pipefd[1],1); // Εγγραφή στην έξοδο του pipe όχι στο stdout
+			
+			
+        } else if((pid=fork()) == 0) { 
+            dup2(pipefd[1],1);
             close(pipefd[0]);
             errno =0;
             execvp(leftArgs[0],leftArgs);
@@ -141,10 +163,13 @@ int ExecuteInput(char** args, int length,int background) {
         } else {
             waitpid(pid,NULL,0);
         }
-    } else { // Δεν υπάρχει διασωλήνωση
-        if(strcmp(args[0],"cd") == 0) { // Αλλαγή directory
-            if(args[1] == NULL) { // Δεν υπάρχει path για την αλλαγή του directory
-            //Επιστροφή στο Home Directory του χρήστη
+		
+		
+		
+		// 无管道
+    } else {
+        if(strcmp(args[0],"cd") == 0) {
+            if(args[1] == NULL) {
                 char* homeDir = getHomeDir();
                 if(changeDir(homeDir) == EXIT_FAILURE) {
                     return EXIT_FAILURE;
@@ -159,6 +184,8 @@ int ExecuteInput(char** args, int length,int background) {
              return Launch(args,background);
         }
     }
+	
+	//释放内存
     Deallocate(leftArgs,left_i);
     Deallocate(rightArgs,right_i);
     return 0;
@@ -177,7 +204,7 @@ char* ReadInput() {
 
     fgets(input,g_commandMax,stdin);
 
-	//执行命令的回车并不需要
+	//去回车
     if(input[strlen(input)-1] == '\n')
     {
         input[strlen(input)-1] = '\0';
@@ -186,7 +213,7 @@ char* ReadInput() {
     return input;
 }
 
-/* Χωρισμός input του χρήστη με βάση το κενό */
+/* 分割字符串 */
 char** TokenizeInput(char* input,int* length) {
     const char delimiters[] = " ";
     char *token;
@@ -200,15 +227,17 @@ char** TokenizeInput(char* input,int* length) {
         exit(EXIT_FAILURE);
     }
 
-    token = strtok(input, delimiters); // Pointer στο τελευταίο token που βρέθηκε
+    token = strtok(input, delimiters);
 
-    while( token != NULL ) // Όσο υπάρχουν και άλλα tokens
+	//有空格
+    while( token != NULL ) 
     {
-        if(token[0] == '*') { // Συναντώ wildcard άρα πρέπει να γίνει expand
-            memmove(token, token+1, strlen(token)); // Αφαιρεί το wildcard
+		// 通配符处理
+        if(token[0] == '*') { 
+            memmove(token, token+1, strlen(token));
             char directory[256];
-            getcwd(directory,sizeof(directory)); // Βρίκει το current directory
-            // Χρησιμοποιούνται για να προσπελάσουμε το φάκελο
+            getcwd(directory,sizeof(directory));
+            
             DIR *dir;
             struct dirent *afile;
             errno = 0;
@@ -218,14 +247,15 @@ char** TokenizeInput(char* input,int* length) {
                 exit(EXIT_FAILURE);
             }
 
-            while( (afile=readdir(dir)) != NULL ) { // Όσο υπάρχουν ακόμη αρχεία
-                if( endsWith(afile->d_name,token) == 1) // Αν το όνομα του αρχείου τελειώνει όπως και το wildcard
+            while( (afile=readdir(dir)) != NULL ) {
+                if( endsWith(afile->d_name,token) == 1)
                 {
-                    tokens[i] = afile->d_name; // Πρόσθεσε το αρχείο στα tokens
+                    tokens[i] = afile->d_name;
                     i+=1;
                 }
             }
-        } else { // Αν δεν υπάρχει wildcard
+			//无通配符
+        } else {
             tokens[i] = token;
             i+=1;
         }
@@ -236,18 +266,11 @@ char** TokenizeInput(char* input,int* length) {
     return tokens;
 }
 
-/* Ανακατεύθυνση εισόδου/εξόδου από/σε αρχείο */
+/* 重定向文件IO */
 int Redirect(char* redirectSymbol,char* filename) {
     int out,in;
     g_out = dup(1);
     g_in = dup(0);
-    /*
-    // Όλα τα αρχεία αποθηκεύονται στο directory του shell, όχι στο current directory
-    char path[150];
-    strcpy(path,getHomeDir());
-    strcat(path,"/");
-    strcat(path,filename);
-    */
 
     if(strcmp(redirectSymbol,">") == 0) {
         errno = 0;
@@ -267,7 +290,7 @@ int Redirect(char* redirectSymbol,char* filename) {
         }
         dup2(out,1);
         close(out);
-    } else { // RedirectSymbol == "<"
+    } else {
         errno = 0;
         in = open(filename, O_RDONLY, S_IRUSR);
         if(errno) {
@@ -277,43 +300,34 @@ int Redirect(char* redirectSymbol,char* filename) {
         dup2(in,0);
         close(in);
     }
-    g_redirect = 1;
     return 0;
 }
 
-/* Ανακατεύθυνση εισόδου/εξόδου πίσω στο stdin/stdout αντίστοιχα */
-void directBack() {
-    dup2(g_out,1);
-    dup2(g_in,0);
-    g_redirect = 0;
-}
-
-/* Με δεδομένη μία λιστα από tokens επιλέγει τα arguments για την κλήση των εσωτερικών/εξωτερικών προγραμμάτων */
+/* 处理分割后的字符串的特殊字符 */
 char** ParseInput(char* input, int* length,int* background) {
     int numOfTokens;
     int numOfArgs = 0;
     char** args;
 
     char** tokens = TokenizeInput(input,&numOfTokens);
-
-    // Πέρασμα για έλεγχο ύπαρξης redirection και την απαρίθμηση των args
+	
     int i;
     for(i=0; i<numOfTokens; i++) {
         if(strcmp(tokens[i],">") == 0 || strcmp(tokens[i],">>") == 0 || strcmp(tokens[i],"<") == 0) {
-            Redirect(tokens[i],tokens[i+1]); // To tokekens[i+1] περιέχει το αρχείο που χρησιμοποιείται στο redirection
-            i++; // Το όνομα του αρχείου που θα γίνει το redirection δεν πρέπει να περιλαμβάνεται στα args
-        } else if(i == numOfTokens-1 && strcmp(tokens[i],"&") == 0){ // Σε περίπτωση που υπάρχει κενό ανάμεσα στο τελευταίο token και το &
-            *background = 1; //Αν η διεργασία πρέπει να εκτελεστεί στο υπόβαθρο αλλάζει η τιμή της background
-        } else if (i == numOfTokens-1 && tokens[i][strlen(tokens[i])-1] == '&') { // Σε περίπτωση που δεν υπάρχει κενό ανάμεσα στο τελευταίο token και το &
-            tokens[i][strlen(tokens[i])-1] = '\0'; // Αφαιρώ το & από τα args
+            Redirect(tokens[i],tokens[i+1]); 
+            i++; 
+        } else if(i == numOfTokens-1 && strcmp(tokens[i],"&") == 0){
+            *background = 1;
+        } else if (i == numOfTokens-1 && tokens[i][strlen(tokens[i])-1] == '&') {
+            tokens[i][strlen(tokens[i])-1] = '\0';
             numOfArgs++;
             *background = 1;
-        } else { // Το & οι χαρακτήρες ανακατεύθυνσης δεν πρέπει να συμπεριληφθούν στα args, άρα ούτε και να καταμετρηθούν
+        } else {
             numOfArgs++;
         }
     }
 
-    if(numOfArgs == 0) { // Για εντολή της μορφής "> file.txt"
+    if(numOfArgs == 0) {
         return NULL;
     }
 
@@ -321,11 +335,11 @@ char** ParseInput(char* input, int* length,int* background) {
     int j = 0;
     for(i=0; i<numOfTokens; i++) {
         if(strcmp(tokens[i],">") == 0 || strcmp(tokens[i],">>") == 0 || strcmp(tokens[i],"<") == 0) {
-            i++; // Το όνομα του αρχείου που θα γίνει το redirection δεν πρέπει να περιλαμβάνεται στα args
+            i++;
         } else if(!(i == numOfTokens-1 && strcmp(tokens[i],"&") == 0)) {
             args[j] = (char*)malloc(sizeof(char) * (strlen(tokens[i]) + 1));
             strcpy(args[j],tokens[i]);
-            //args[j] = tokens[i];
+            
 
             j++;
         }
@@ -337,29 +351,31 @@ char** ParseInput(char* input, int* length,int* background) {
     return args;
 }
 
-/* Συνάρτηση που υλοποιεί τον αλγόριθμο δρομολόγησης μνήμης RR */
+/* 处理进程链表 */
 void Round_Robbin(int signal){
     int status;
+	
     if(head == NULL) {
-        //printf("No process in the background!\n");
-    } else {       // Αν υπάρχει έστω και μια διεργασία στη λίστα
-        if(running_pid == 0) {     // Αν δεν εκτελείται καμία διεργασία στο υπόβαθρο
-            running_pid=head->id;   // Η διεργασία που θα εκτελεστεί είναι η πρώτη της λίστας
+        
+    } else {
+		
+        if(running_pid == 0) {     
+            running_pid=head->id;
             kill(running_pid,SIGCONT);
-        } else {   // Αν υπάρχει ήδη διεργασία από τη λίστα που εκτελείται
-            pid_t check = waitpid(running_pid,&status,WNOHANG); // Ελέγχουμε την κατάσταση της εκτελούμενης διεργασίας
-            if(check == 0) { // Αν η διεργασία δεν έχει τερματίσει, αλλά έχει τελειώσει ο χρόνος που της δίνει ο RR
-                kill(running_pid,SIGSTOP); // Τη σταματάμε
-                head = addProcessInList(running_pid,head); // Την προσθέτουμε στο τέλος της λίστας
-                head = deleteFirstProcess(head);    // Τη διαγράφουμε από την αρχή της λίστας
-                running_pid = head->id; // Διαλέγουμε την επόμενη διεργασία για να συνεχίσει την εκτέλεσή της
+        } else {
+            pid_t check = waitpid(running_pid,&status,WNOHANG);
+            if(check == 0) {
+                kill(running_pid,SIGSTOP);
+                head = addProcessInList(running_pid,head);
+                head = deleteFirstProcess(head);
+                running_pid = head->id;
                 kill(running_pid,SIGCONT);
             } else if(check == -1) {
                 printf("\nProblem with executing the process!\n");
             } else {
                 printf("\nProcess with pid: %d has ended!\n",running_pid);
-                head = deleteFirstProcess(head); // Όταν τελειώνει διαγράφεται από τη λίστα
-                running_pid = 0; // Και η διεργασία που εκτελείται αρχικοποιείται στο 0 έτσι ώστε να αρχίσει να εκτελείται η επόμενη διεργασία
+                head = deleteFirstProcess(head);
+                running_pid = 0;
             }
         }
     }

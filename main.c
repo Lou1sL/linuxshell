@@ -18,14 +18,17 @@ int main()
 	struct itimerval timer={interval,value};
 	setitimer(ITIMER_REAL, &timer, 0);
 
-	//每秒调用一次Round_Robbin函数
+	//轮询
 	signal(SIGALRM,&Round_Robbin);
 
+	//主循环
     while (1) {
-        // Εκτύπωση προτροπής στην κονσόλα του shell
+        
         errno = 0;
         char cwd[g_currentDirectoryMax];
-        getcwd(cwd, sizeof(cwd)); // Εύρεση του τρέχοντα φακέλου που βρίσκεται το shell
+		
+		//当前工作路径
+        getcwd(cwd, sizeof(cwd)); 
         if (errno) {
             perror("An error occured");
             exit(EXIT_FAILURE);
@@ -33,18 +36,12 @@ int main()
 		
 		//每行命令的prefix和路径提示
         printf("MyShell:%s:$ ", cwd);
-        // Watning για scroll window (αποτρέπει τη σωστή εμφάνιση της προτροπής):
-        // http://askubuntu.com/questions/435528/gedit-warning-gtkscrolledwindow-is-mapped-but-visible-child-gtkscrollbar-is-not
-        // Κύριο πρόγραμμα
-        input = ReadInput(); // 1. Ανάγνωση εντολής χρήστη
-        args = ParseInput(input, &length, &background); // 2. Επεξεργασία εντολής χρήστη
-        if(ExecuteInput(args,length,background) == EXIT_FAILURE) { // 3. Εκτέλεση εντολής χρήστη
+		
+		//读输入，执行
+        input = ReadInput(); 
+        args = ParseInput(input, &length, &background);
+        if(ExecuteInput(args,length,background) == EXIT_FAILURE) {
                 return EXIT_FAILURE;
-        }
-        // Αν έχει γίνει ανακατεύθυνση σε αρχείο πρέπει να γίνει πάλι ανακατεύθυνση του output στην κονσόλα
-        if(g_redirect) {
-
-            directBack();
         }
     }
 
