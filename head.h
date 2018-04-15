@@ -11,18 +11,24 @@
 #include <sys/time.h>
 #include <dirent.h>
 
+//用户命令字符串缓冲区大小
 int g_commandMax = 1024;
+//用户命令分割后的最大支持数量
 int g_commandMaxWords = 128;
+//路径缓冲区大小
 int g_currentDirectoryMax = 1024;
+//输出描述符
 int g_out;
+//输入描述符
 int g_in;
+
 int running_pid=0;
 
+//PID链表
 struct process{
     int id;
-    struct process *next
+    struct process *next;
 }*head=NULL;
-
 struct process* addProcessInList(int process_id, struct process *head){
 
     struct process *newNode = (struct process*)malloc(sizeof(struct process));
@@ -48,7 +54,6 @@ struct process* addProcessInList(int process_id, struct process *head){
     }
 
 }
-
 struct process* deleteFirstProcess(struct process *head){
 
     struct process *temp;
@@ -57,6 +62,7 @@ struct process* deleteFirstProcess(struct process *head){
     return temp;
 
 }
+
 
 int endsWith(char *s,char *end);
 char* getHomeDir();

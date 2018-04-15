@@ -3,7 +3,9 @@
 
 int main()
 {
+	//用户输入的字符串在这里
     char* input;
+	//切分后的字符串数组在这里
     char** args;
     int length;
 
@@ -13,12 +15,13 @@ int main()
 	
     int background = 0;
 
+	
     struct timeval value={1,0};
 	struct timeval interval={1,0};
 	struct itimerval timer={interval,value};
 	setitimer(ITIMER_REAL, &timer, 0);
 
-	//轮询
+	//轮询，一秒执行一次Round_Robbin函数
 	signal(SIGALRM,&Round_Robbin);
 
 	//主循环
